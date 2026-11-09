@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Yörünge</title>
+<meta name="description" content="Gezegenden gezegene atlanan tek tuşlu bir uzay oyunu.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070A18; --fg:#F2F4FF; --muted:#9AA3C7; --accent:#7DF9FF; --accent-2:#FF5C8A; --gold:#FFD166;
+  --panel:rgba(14,18,40,.78); --line:rgba(255,255,255,.12);
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--fg);
+  font-family:"Space Grotesk",system-ui,sans-serif;-webkit-tap-highlight-color:transparent;user-select:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none}
+:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+.corner{position:fixed;top:max(12px,env(safe-area-inset-top));z-index:3;display:flex;gap:8px}
+.corner.r{right:12px} .corner.l{left:12px}
+.icon{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;background:rgba(255,255,255,.06);
+  border:1px solid var(--line);color:var(--muted);transition:background .2s,color .2s}
+.icon[hidden]{display:none}
+.icon:hover{background:rgba(255,255,255,.12);color:var(--fg)}
+.icon svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+.panel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;width:min(360px,calc(100vw - 32px));
+  text-align:center;padding:32px 24px 26px;border-radius:22px;background:var(--panel);border:1px solid var(--line);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);box-shadow:0 20px 60px rgba(0,0,0,.45);
+  transition:opacity .25s ease,transform .25s ease}
+.panel[hidden]{display:block;opacity:0;pointer-events:none;transform:translate(-50%,-46%)}
+h1{font-size:52px;font-weight:700;letter-spacing:-.03em;line-height:1;
+  background:linear-gradient(120deg,var(--accent),#B69CFF 55%,var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+h2{font-size:22px;font-weight:700}
+.lead{color:var(--muted);margin:12px 0 22px;line-height:1.5}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-width:180px;height:54px;padding:0 28px;border-radius:999px;
+  background:var(--accent);color:#06101C;font-weight:700;font-size:18px;letter-spacing:.02em;
+  box-shadow:0 0 0 0 rgba(125,249,255,.5);transition:transform .15s ease,box-shadow .3s ease}
+.btn:hover{box-shadow:0 0 28px 2px rgba(125,249,255,.35)}
+.btn:active{transform:scale(.96)}
+.hint{margin-top:14px;font-size:13px;color:var(--muted)}
+kbd{font-family:inherit;font-size:12px;padding:1px 7px;border:1px solid var(--line);border-radius:6px;background:rgba(255,255,255,.06);color:var(--fg)}
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0 0 24px;font-size:12.5px;color:var(--muted)}
+.how div{padding:12px 6px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+.how b{display:block;color:var(--fg);font-size:15px;margin-bottom:2px}
+.big{font-size:76px;font-weight:700;letter-spacing:-.04em;line-height:1;margin:14px 0 4px}
+.stats{display:flex;justify-content:center;gap:22px;color:var(--muted);font-size:14px;margin-bottom:22px}
+.stats b{color:var(--fg)}
+.newbest{display:inline-block;margin-top:10px;padding:4px 12px;border-radius:999px;background:rgba(255,209,102,.14);color:var(--gold);font-weight:700;font-size:13px}
+.best{margin-top:12px;font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.panel,.btn{transition:none}}
+</style>
+</head>
+<body>
+<canvas id="c" aria-label="Oyun alanı"></canvas>
+
+<div class="corner l"><button class="icon" id="pauseBtn" aria-label="Duraklat (P)" hidden>
+  <svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button></div>
+<div class="corner r"><button class="icon" id="muteBtn" aria-label="Sesi kapat (M)">
+  <svg viewBox="0 0 24 24" id="muteIcon"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg></button></div>
+
+<section class="panel" id="titleP" aria-labelledby="t1">
+  <h1 id="t1">Yörünge</h1>
+  <p class="lead">Gezegenlerin etrafında dön, doğru anda bırak ve bir sonrakine yakalan.</p>
+  <div class="how">
+    <div><b>Dön</b>yörüngede kal</div>
+    <div><b>Bırak</b>düz çizgide uç</div>
+    <div><b>Yakalan</b>sonraki halkaya gir</div>
+  </div>
+  <button class="btn" id="playBtn">Başla</button>
+  <p class="hint"><kbd>Boşluk</kbd> · tıkla · dokun</p>
+  <p class="best" id="bestTitle"></p>
+</section>
+
+<section class="panel" id="overP" hidden aria-labelledby="t2" aria-live="polite">
+  <h2 id="t2">Uzayda kayboldun</h2>
+  <div class="big" id="finalScore">0</div>
+  <div class="stats"><span><b id="fPlanets">0</b> gezegen</span><span><b id="fStars">0</b> yıldız</span><span>en iyi <b id="fBest">0</b></span></div>
+  <button class="btn" id="againBtn">Tekrar</button>
+  <p class="hint"><kbd>Boşluk</kbd> ile yeniden başla</p>
+  <div id="newBest" hidden><span class="newbest">Yeni rekor!</span></div>
+</section>
+
+<section class="panel" id="pauseP" hidden aria-labelledby="t3">
+  <h2 id="t3">Duraklatıldı</h2>
+  <p class="lead">Kaldığın yerden devam etmeye hazır olduğunda.</p>
+  <button class="btn" id="resumeBtn">Devam</button>
+  <p class="hint"><kbd>P</kbd> ya da <kbd>Boşluk</kbd></p>
+</section>
+
+<script>
+(() => {
+'use strict';
+const W = 420, H = 760;                 // logical play field
+const cvs = document.getElementById('c'), ctx = cvs.getContext('2d');
+const $ = id => document.getElementById(id);
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('yorunge.' + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem('yorunge.' + k, JSON.stringify(v)); } catch {} },
+};
+
+const PALETTE = [
+  ['#FF9F6E', '#B4361A'], ['#7DF9FF', '#1B5E9E'], ['#B69CFF', '#4A2C9B'], ['#FF6F9F', '#8E1E4F'],
+  ['#9BF27A', '#2F7A3A'], ['#FFD166', '#A0601A'], ['#6EC1FF', '#20357F'], ['#F7A8FF', '#7A2C8E'],
+];
+
+let dpr = 1, scale = 1, ox = 0, oy = 0, vw = 0, vh = 0;
+function resize() {
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  vw = innerWidth; vh = innerHeight;
+  cvs.width = Math.round(vw * dpr); cvs.height = Math.round(vh * dpr);
+  scale = Math.min(vw / W, vh / H);
+  ox = (vw - W * scale) / 2; oy = (vh - H * scale) / 2;
+}
+addEventListener('resize', resize); resize();
+
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// ---------- background stars (parallax, generated once) ----------
+const bgStars = Array.from({ length: 170 }, () => ({
+  x: Math.random() * W, y: Math.random() * H, z: rand(.15, 1), tw: Math.random() * Math.PI * 2,
+}));
+
+// ---------- audio ----------
+let actx = null, muted = store.get('muted', false);
+function audio() {
+  if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch { return null; } }
+  if (actx.state === 'suspended') actx.resume();
+  return actx;
+}
+function tone(freq, dur, type = 'sine', vol = .12, slide = 0) {
+  if (muted || (mode !== 'play' && mode !== 'dying')) return;
+  const a = audio(); if (!a) return;
+  const o = a.createOscillator(), g = a.createGain(), t = a.currentTime;
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, freq + slide), t + dur);
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + .012); g.gain.exponentialRampToValueAtTime(.0008, t + dur);
+  o.connect(g).connect(a.destination); o.start(t); o.stop(t + dur + .02);
+}
+const sfx = {
+  release: () => tone(320, .14, 'triangle', .07, 260),
+  capture: n => { tone(520 + (n % 8) * 40, .18, 'sine', .12); setTimeout(() => tone(780 + (n % 8) * 40, .22, 'sine', .08), 60); },
+  star: () => { tone(1320, .12, 'sine', .07); setTimeout(() => tone(1760, .16, 'sine', .06), 50); },
+  die: () => tone(220, .6, 'sawtooth', .07, -180),
+  warn: () => tone(880, .05, 'square', .025),
+};
+
+// ---------- world ----------
+let mode = 'title';        // title | play | dying | over | paused
+let planets, items, parts, floaters, player, cam, score, planetsHit, starsGot, speed, shake, dyingT, deathMsg, demoResetT, planetCount;
+
+function mkPlanet(x, y, r, orbit, idx) {
+  const [c1, c2] = PALETTE[idx % PALETTE.length];
+  return { x, y, r, orbit, c1, c2, idx, visited: false, vx: 0, ring: Math.random() < .35, ringTilt: rand(-.5, .5),
+           bands: Math.random() < .6, spin: Math.random() * 6, pulse: 0 };
+}
+
+function addPlanet() {
+  const last = planets[planets.length - 1];
+  const idx = ++planetCount;
+  const r = rand(15, 31), orbit = r + rand(30, 44);
+  const gap = Math.max(rand(150, 215) + Math.min(idx, 30) * 1.2, last.orbit + orbit + 46);
+  const y = last.y - gap;
+  let x;
+  do { x = rand(orbit + 16, W - orbit - 16); } while (Math.abs(x - last.x) < 40 && Math.random() < .7);
+  const p = mkPlanet(x, y, r, orbit, idx);
+  if (idx > 9 && Math.random() < Math.min(.55, (idx - 9) * .045)) p.vx = rand(28, 58) * (Math.random() < .5 ? -1 : 1);
+  planets.push(p);
+  // collectible stars: on the new orbit ring or along the route between planets
+  if (Math.random() < .6) {
+    if (Math.random() < .5) {
+      const a = rand(0, Math.PI * 2);
+      items.push({ planet: p, a, x: 0, y: 0, got: false, t: Math.random() * 6 });
+    } else {
+      const t = rand(.35, .65);
+      items.push({ planet: null, x: last.x + (x - last.x) * t + rand(-30, 30), y: last.y + (y - last.y) * t, got: false, t: Math.random() * 6 });
+    }
+  }
+}
+
+function reset() {
+  planets = []; items = []; parts = []; floaters = [];
+  planetCount = 0;
+  const first = mkPlanet(W / 2, H - 175, 30, 72, 0);
+  first.visited = true;
+  planets.push(first);
+  while (planets.length < 9) addPlanet();
+  player = { state: 'orbit', p: first, a: -Math.PI / 2, dir: 1, rad: first.orbit, x: 0, y: 0, vx: 0, vy: 0,
+             ft: 0, from: null, orbitT: 0, trail: [], warned: 0 };
+  cam = { y: 0 };
+  score = 0; planetsHit = 0; starsGot = 0; speed = 205; shake = 0; dyingT = 0; demoResetT = 0;
+  placeOnOrbit();
+}
+
+function placeOnOrbit() {
+  const p = player.p;
+  player.x = p.x + Math.cos(player.a) * player.rad;
+  player.y = p.y + Math.sin(player.a) * player.rad;
+}
+
+function orbitLimit() { return planetsHit < 3 ? Infinity : Math.max(2.6, 5.4 - planetsHit * .07); }
+
+function release() {
+  if (player.state !== 'orbit') return;
+  const p = player.p, s = speed * 1.12;
+  player.vx = -Math.sin(player.a) * player.dir * s + p.vx;
+  player.vy = Math.cos(player.a) * player.dir * s;
+  player.state = 'fly'; player.ft = 0; player.from = p;
+  sfx.release();
+  burst(player.x, player.y, '#7DF9FF', 8, 60);
+}
+
+function capture(p) {
+  const rx = player.x - p.x, ry = player.y - p.y;
+  const rvx = player.vx - p.vx, rvy = player.vy;
+  player.state = 'orbit'; player.p = p;
+  player.a = Math.atan2(ry, rx);
+  player.rad = Math.hypot(rx, ry);
+  player.dir = rx * rvy - ry * rvx > 0 ? 1 : -1;
+  player.orbitT = 0; player.warned = 0;
+  p.pulse = 1;
+  if (!p.visited) {
+    p.visited = true; planetsHit++; score++;
+    speed = Math.min(330, 205 + planetsHit * 3.6);
+    burst(player.x, player.y, p.c1, 22, 160);
+    floater(p.x, p.y - p.orbit - 12, '+1', p.c1);
+    sfx.capture(planetsHit);
+    while (planets.filter(q => q.y < p.y).length < 7) addPlanet();
+  }
+}
+
+function die(msg) {
+  if (mode !== 'play') { if (mode === 'title') demoResetT = .9; return; }
+  mode = 'dying'; dyingT = .9; deathMsg = msg;
+  shake = reduceMotion ? 0 : 14;
+  burst(player.x, player.y, '#FF5C8A', 40, 260);
+  burst(player.x, player.y, '#7DF9FF', 20, 180);
+  sfx.die();
+}
+
+function burst(x, y, color, n, sp) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = rand(.25, 1) * sp;
+    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: rand(.4, .9), max: .9, color, size: rand(1.2, 3) });
+  }
+}
+function floater(x, y, text, color) { floaters.push({ x, y, text, color, life: 1 }); }
+
+// ---------- demo bot (plays behind the title screen) ----------
+function botThink() {
+  if (player.state !== 'orbit' || player.orbitT < .35) return;
+  const p = player.p;
+  const target = planets.find(q => !q.visited && q.y < p.y);
+  if (!target) return;
+  const ux = -Math.sin(player.a) * player.dir, uy = Math.cos(player.a) * player.dir;
+  const dx = target.x - player.x, dy = target.y - player.y;
+  const along = dx * ux + dy * uy;
+  if (along <= 0) return;
+  const perp = Math.abs(dx * uy - dy * ux);
+  const tHit = along / (speed * 1.12);
+  const lead = target.vx * tHit;   // aim where a moving planet will be
+  const perpLead = Math.abs((dx + lead) * uy - dy * ux);
+  if (Math.min(perp, perpLead) < target.orbit * .45 && tHit < 1.9) release();
+}
+
+// ---------- update ----------
+function update(dt) {
+  for (const p of planets) {
+    if (p.vx) { p.x += p.vx * dt; if (p.x < p.orbit + 10 || p.x > W - p.orbit - 10) { p.vx *= -1; p.x = clamp(p.x, p.orbit + 10, W - p.orbit - 10); } }
+    p.spin += dt * .3; p.pulse = Math.max(0, p.pulse - dt * 2);
+  }
+
+  if (mode === 'play' || mode === 'title') {
+    if (mode === 'title') {
+      if (demoResetT > 0) { demoResetT -= dt; if (demoResetT <= 0) reset(); }
+      else botThink();
+    }
+    if (player.state === 'orbit') {
+      const p = player.p;
+      player.a += player.dir * speed / player.rad * dt;
+      player.rad += (p.orbit - player.rad) * Math.min(1, dt * 6);
+      player.orbitT += dt;
+      placeOnOrbit();
+      const lim = orbitLimit();
+      if (lim - player.orbitT < 1.2 && player.orbitT - player.warned > .3) { player.warned = player.orbitT; sfx.warn(); }
+      if (player.orbitT > lim) release();
+    } else if (player.state === 'fly') {
+      player.x += player.vx * dt; player.y += player.vy * dt; player.ft += dt;
+      for (const p of planets) {
+        if (p === player.from && player.ft < .35) continue;
+        if (Math.hypot(player.x - p.x, player.y - p.y) <= p.orbit) { capture(p); break; }
+      }
+      if (player.state === 'fly') {
+        if (player.x < -6 || player.x > W + 6) die('Sınırın dışına çıktın');
+        else if (player.y - cam.y > H + 24) die('Aşağı düştün');
+        else if (player.ft > 2.3) die('Uzayda kayboldun');
+      }
+    }
+
+    // collectibles
+    for (const it of items) {
+      if (it.got) continue;
+      if (it.planet) { it.a += dt * .6; it.x = it.planet.x + Math.cos(it.a) * it.planet.orbit; it.y = it.planet.y + Math.sin(it.a) * it.planet.orbit; }
+      if (player.state !== 'dead' && Math.hypot(player.x - it.x, player.y - it.y) < 17) {
+        it.got = true; starsGot++; score++;
+        burst(it.x, it.y, '#FFD166', 14, 120);
+        floater(it.x, it.y - 14, '+1', '#FFD166');
+        sfx.star();
+      }
+    }
+
+    // camera only climbs; falling below it is fatal
+    const target = player.y - H * .6;
+    const desired = Math.min(cam.y, target);
+    cam.y += (desired - cam.y) * Math.min(1, dt * 3.5);
+
+    // drop what is far below
+    planets = planets.filter(p => p.y - cam.y < H + 260 || p === player.p);
+    items = items.filter(it => !it.got && it.y - cam.y < H + 200);
+
+    player.trail.push({ x: player.x, y: player.y });
+    if (player.trail.length > 26) player.trail.shift();
+  } else if (mode === 'dying') {
+    dyingT -= dt;
+    if (dyingT <= 0) gameOver();
+  }
+
+  for (const q of parts) { q.x += q.vx * dt; q.y += q.vy * dt; q.vx *= .97; q.vy *= .97; q.life -= dt; }
+  parts = parts.filter(q => q.life > 0);
+  for (const f of floaters) { f.y -= 34 * dt; f.life -= dt * 1.1; }
+  floaters = floaters.filter(f => f.life > 0);
+  shake = Math.max(0, shake - dt * 40);
+}
+
+// ---------- draw ----------
+function draw(time) {
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const g = ctx.createLinearGradient(0, 0, 0, vh);
+  g.addColorStop(0, '#0B0F2A'); g.addColorStop(1, '#05060F');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, vw, vh);
+
+  ctx.save();
+  const sx = shake ? rand(-shake, shake) * .5 : 0, sy = shake ? rand(-shake, shake) * .5 : 0;
+  ctx.translate(ox + sx * scale, oy + sy * scale);
+  ctx.scale(scale, scale);
+
+  // nebula glow
+  const ny = ((-cam.y * .05) % 900 + 900) % 900;
+  nebula(W * .2, ny - 200, 260, 'rgba(120,80,255,.10)');
+  nebula(W * .85, ny + 260, 300, 'rgba(255,92,138,.07)');
+  nebula(W * .5, ny + 700, 280, 'rgba(60,200,255,.07)');
+
+  // parallax stars
+  for (const s of bgStars) {
+    const y = ((s.y - cam.y * s.z * .35) % H + H) % H;
+    const a = .25 + .55 * s.z * (.7 + .3 * Math.sin(time / 600 + s.tw));
+    ctx.fillStyle = `rgba(220,230,255,${a})`;
+    ctx.fillRect(s.x, y, s.z * 1.8, s.z * 1.8);
+  }
+
+  // side boundaries
+  const edge = (x, dir) => {
+    const eg = ctx.createLinearGradient(x, 0, x + dir * 26, 0);
+    eg.addColorStop(0, 'rgba(255,92,138,.22)'); eg.addColorStop(1, 'rgba(255,92,138,0)');
+    ctx.fillStyle = eg; ctx.fillRect(Math.min(x, x + dir * 26), 0, 26, H);
+  };
+  edge(0, 1); edge(W, -1);
+
+  ctx.translate(0, -cam.y);
+
+  // orbits
+  for (const p of planets) {
+    const current = player.state === 'orbit' && player.p === p;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.orbit, 0, Math.PI * 2);
+    ctx.setLineDash(current ? [] : [3, 7]);
+    ctx.lineWidth = current ? 1.6 : 1.2;
+    ctx.strokeStyle = current ? hexA(p.c1, .55) : (p.visited ? 'rgba(255,255,255,.10)' : hexA(p.c1, .32 + p.pulse * .4));
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (current && isFinite(orbitLimit())) {
+      const left = clamp(1 - player.orbitT / orbitLimit(), 0, 1);
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.orbit + 6, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2);
+      ctx.lineWidth = 3; ctx.lineCap = 'round';
+      ctx.strokeStyle = left < .25 ? 'rgba(255,92,138,.9)' : hexA(p.c1, .6);
+      ctx.stroke(); ctx.lineCap = 'butt';
+    }
+  }
+
+  // planets
+  for (const p of planets) drawPlanet(p);
+
+  // collectibles
+  for (const it of items) {
+    it.t += .016;
+    const s = 7 + Math.sin(it.t * 4) * 1.2;
+    ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(it.t);
+    ctx.shadowColor = '#FFD166'; ctx.shadowBlur = 14;
+    ctx.fillStyle = '#FFD166';
+    starPath(s, s * .45); ctx.fill();
+    ctx.restore();
+  }
+
+  // trail
+  if (mode !== 'dying' && mode !== 'over') {
+    const tr = player.trail;
+    for (let i = 1; i < tr.length; i++) {
+      const k = i / tr.length;
+      ctx.strokeStyle = `rgba(125,249,255,${k * .5})`;
+      ctx.lineWidth = 1 + k * 5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(tr[i - 1].x, tr[i - 1].y); ctx.lineTo(tr[i].x, tr[i].y); ctx.stroke();
+    }
+    // player
+    ctx.save();
+    ctx.shadowColor = '#7DF9FF'; ctx.shadowBlur = 22;
+    ctx.fillStyle = '#E9FEFF';
+    ctx.beginPath(); ctx.arc(player.x, player.y, 6.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // aim guide while orbiting (first planets only, helps learning)
+    if (player.state === 'orbit' && mode === 'play' && planetsHit < 2) {
+      const ux = -Math.sin(player.a) * player.dir, uy = Math.cos(player.a) * player.dir;
+      const gl = ctx.createLinearGradient(player.x, player.y, player.x + ux * 120, player.y + uy * 120);
+      gl.addColorStop(0, 'rgba(125,249,255,.45)'); gl.addColorStop(1, 'rgba(125,249,255,0)');
+      ctx.strokeStyle = gl; ctx.lineWidth = 2; ctx.setLineDash([4, 6]);
+      ctx.beginPath(); ctx.moveTo(player.x, player.y); ctx.lineTo(player.x + ux * 120, player.y + uy * 120); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // particles
+  for (const q of parts) {
+    ctx.globalAlpha = clamp(q.life / q.max, 0, 1);
+    ctx.fillStyle = q.color;
+    ctx.beginPath(); ctx.arc(q.x, q.y, q.size, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // floating +1
+  ctx.textAlign = 'center'; ctx.font = '700 18px "Space Grotesk", system-ui, sans-serif';
+  for (const f of floaters) { ctx.globalAlpha = clamp(f.life, 0, 1); ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, f.y); }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+
+  // HUD
+  if (mode === 'play' || mode === 'dying' || mode === 'paused') {
+    ctx.save();
+    ctx.translate(ox, oy); ctx.scale(scale, scale);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#F2F4FF';
+    ctx.font = '700 56px "Space Grotesk", system-ui, sans-serif';
+    ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 12;
+    ctx.fillText(score, W / 2, 92);
+    ctx.shadowBlur = 0;
+    ctx.font = '500 14px "Space Grotesk", system-ui, sans-serif';
+    ctx.fillStyle = '#9AA3C7';
+    ctx.fillText(`★ ${starsGot}   ·   en iyi ${Math.max(best, score)}`, W / 2, 118);
+    if (planetsHit === 0 && player.state === 'orbit' && mode === 'play') {
+      ctx.font = '500 16px "Space Grotesk", system-ui, sans-serif';
+      ctx.fillStyle = `rgba(242,244,255,${.6 + .3 * Math.sin(time / 300)})`;
+      ctx.fillText('Kesik çizgi sonraki halkayı gösterdiğinde bırak', W / 2, H - 40);
+    }
+    ctx.restore();
+  }
+}
+
+function nebula(x, y, r, color) {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = g; ctx.fillRect(x - r, y - r, r * 2, r * 2);
+}
+
+function starPath(R, r) {
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r : R;
+    ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr);
+  }
+  ctx.closePath();
+}
+
+function drawPlanet(p) {
+  const { x, y, r } = p;
+  // glow
+  const glow = ctx.createRadialGradient(x, y, r * .6, x, y, r * 2.2);
+  glow.addColorStop(0, hexA(p.c1, .22 + p.pulse * .25)); glow.addColorStop(1, hexA(p.c1, 0));
+  ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(x, y, r * 2.2, 0, Math.PI * 2); ctx.fill();
+
+  if (p.ring) ringHalf(p, true);
+  const body = ctx.createRadialGradient(x - r * .4, y - r * .45, r * .1, x, y, r);
+  body.addColorStop(0, p.c1); body.addColorStop(1, p.c2);
+  ctx.fillStyle = body; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  if (p.bands) {
+    ctx.save(); ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.clip();
+    ctx.globalAlpha = .18; ctx.fillStyle = '#fff';
+    for (let i = -2; i <= 2; i++) {
+      const by = y + i * r * .42 + Math.sin(p.spin + i) * 2;
+      ctx.fillRect(x - r, by, r * 2, r * .14);
+    }
+    ctx.restore();
+  }
+  // terminator shadow
+  const sh = ctx.createRadialGradient(x + r * .5, y + r * .55, r * .2, x + r * .2, y + r * .2, r * 1.3);
+  sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,.35)');
+  ctx.fillStyle = sh; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  if (p.ring) ringHalf(p, false);
+  if (p.visited && !(player.p === p && player.state === 'orbit')) {
+    ctx.fillStyle = 'rgba(5,6,15,.35)'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
+function ringHalf(p, back) {
+  ctx.save();
+  ctx.translate(p.x, p.y); ctx.rotate(p.ringTilt);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, p.r * 1.75, p.r * .42, 0, back ? Math.PI : 0, back ? Math.PI * 2 : Math.PI);
+  ctx.strokeStyle = hexA(p.c1, back ? .35 : .75); ctx.lineWidth = 3; ctx.stroke();
+  ctx.restore();
+}
+
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+// ---------- flow ----------
+let best = store.get('best', 0);
+const panels = { title: $('titleP'), over: $('overP'), paused: $('pauseP') };
+function showPanel(name) {
+  for (const [k, el] of Object.entries(panels)) el.hidden = k !== name;
+  $('pauseBtn').hidden = !(mode === 'play');
+  const btn = name === 'title' ? $('playBtn') : name === 'over' ? $('againBtn') : name === 'paused' ? $('resumeBtn') : null;
+  if (btn) setTimeout(() => btn.focus({ preventScroll: true }), 60);
+}
+function updateBestTitle() { $('bestTitle').textContent = best > 0 ? `En iyi skorun: ${best}` : ''; }
+
+let overAt = 0;
+function start() {
+  audio();
+  reset();
+  mode = 'play';
+  showPanel(null);
+}
+function gameOver() {
+  mode = 'over';
+  const isBest = score > best;
+  if (isBest) { best = score; store.set('best', best); }
+  $('t2').textContent = deathMsg;
+  $('finalScore').textContent = score;
+  $('fPlanets').textContent = planetsHit;
+  $('fStars').textContent = starsGot;
+  $('fBest').textContent = best;
+  $('newBest').hidden = !isBest;
+  overAt = performance.now();
+  showPanel('over');
+}
+function pause() { if (mode !== 'play') return; mode = 'paused'; showPanel('paused'); }
+function resume() { if (mode !== 'paused') return; mode = 'play'; showPanel(null); last = performance.now(); }
+
+function action() {
+  if (mode === 'play') release();
+  else if (mode === 'title') start();
+  else if (mode === 'over' && performance.now() - overAt > 450) start();
+  else if (mode === 'paused') resume();
+}
+
+cvs.addEventListener('pointerdown', e => { e.preventDefault(); action(); });
+$('playBtn').addEventListener('click', e => { e.stopPropagation(); start(); });
+$('againBtn').addEventListener('click', e => { e.stopPropagation(); start(); });
+$('resumeBtn').addEventListener('click', e => { e.stopPropagation(); resume(); });
+$('pauseBtn').addEventListener('click', e => { e.stopPropagation(); pause(); });
+$('muteBtn').addEventListener('click', e => { e.stopPropagation(); toggleMute(); });
+
+addEventListener('keydown', e => {
+  if (e.repeat) return;
+  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'KeyW') { e.preventDefault(); action(); }
+  else if (e.code === 'Enter' && document.activeElement?.tagName !== 'BUTTON') { e.preventDefault(); action(); }
+  else if (e.code === 'KeyP' || e.code === 'Escape') { mode === 'play' ? pause() : resume(); }
+  else if (e.code === 'KeyM') toggleMute();
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+addEventListener('blur', pause);
+
+function toggleMute() {
+  muted = !muted; store.set('muted', muted);
+  $('muteBtn').setAttribute('aria-label', muted ? 'Sesi aç (M)' : 'Sesi kapat (M)');
+  $('muteIcon').innerHTML = muted
+    ? '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/>'
+    : '<path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/>';
+}
+if (muted) { muted = false; toggleMute(); }
+
+// ---------- loop ----------
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(1 / 30, (now - last) / 1000);
+  last = now;
+  if (mode !== 'paused' && mode !== 'over') update(dt);
+  else if (mode === 'over') update(dt * .25);
+  draw(now);
+  requestAnimationFrame(frame);
+}
+
+reset();
+updateBestTitle();
+showPanel('title');
+requestAnimationFrame(frame);
+
+// test hook: ?demo=1 lets the bot play a real (scored) round
+if (new URLSearchParams(location.search).has('demo')) {
+  window.__yorunge = { get state() { return { mode, score, planetsHit, starsGot, deathMsg }; } };
+  let frames = 0;
+  const tick = () => {
+    if (mode === 'play') botThink();
+    if (++frames % 30 === 0) document.title = JSON.stringify({ mode, score, planetsHit, starsGot, deathMsg: deathMsg || null, frames });
+    requestAnimationFrame(tick);
+  };
+  start(); tick();
+}
+})();
+</script>
+</body>
+</html>
